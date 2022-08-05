@@ -1,0 +1,120 @@
+---
+title: "bike_sharing_report"
+author: "Mila"
+date: "2022-08-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+Install and load the necessary packages.
+```{r intro}
+library(tidyverse)  #helps wrangle data
+library(lubridate)  #helps wrangle date attributes
+library(ggplot2)  #helps visualize data
+```
+Check your current directory.
+```{r directory}
+getwd()
+```
+Change your working directory if necessary with setwd("new_directory").
+
+## Data Collection
+I have previously cleaned and combined data from 12 months into four quarters. Let's combine now that data into one year. 
+```{r data_merging}
+q1 <- read_csv("q1.csv")
+q2 <- read_csv("q2.csv")
+q3 <- read_csv("q3.csv")
+q4 <- read_csv("q4.csv")
+yearly_trips <- bind_rows(q1,q2,q3,q4)
+```
+Check the column names and data types with 
+```{r data_type_check}
+sapply(yearly_trips, typeof)
+```
+I have previously deleted unnecessary rows with
+```{r eval=FALSE}
+yearly_trips <- yearly_trips %>%  
+  select(-c(start_lat, start_lng, end_lat, end_lng))
+
+```
+Add the columns that will list date, month, day of the week, and year of the ride. This will make data aggregation easier.
+```{r adding_columns}
+yearly_trips$date <- as.Date(yearly_trips$started_at)
+yearly_trips$month <- format(as.Date(yearly_trips$date), "%m")
+yearly_trips$day <- format(as.Date(yearly_trips$date), "%d")
+yearly_trips$year <- format(as.Date(yearly_trips$date), "%Y")
+yearly_trips$day_of_week <- format(as.Date(yearly_trips$date), "%A")
+```
+Add a ride_length column to the data.
+
+```{r warning=FALSE}
+yearly_trips$ride_length <- difftime(yearly_trips$ended_at,yearly_trips$started_at)
+```
+
+There are going to be rows with negative ride lengths. Delete them with
+
+```{r}
+yearly_trips <- yearly_trips[!(yearly_trips$ride_length<=0),]
+
+```
+
+You can also get rid of some rows containing blank or N/A values with
+```{r eval=FALSE}
+yearly_trips <- yearly_trips[!(is.na(yearly_trips$start_station_id) | yearly_trips$start_station_id==""), ]
+```
+
+## Aggregation and Visualization
+Make a new dataset that aggreates weekday and membership type.
+```{r message=FALSE, warning=FALSE}
+trips_weekday <- yearly_trips %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday)
+
+```
+Visualize the number of rides by rider type depending on weekday.
+
+```{r}
+trips_weekday %>% ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge")
+
+```
+
+Do the same but with average duration for trips.
+
+```{r message=FALSE, warning=FALSE}
+trips_weekday %>% ggplot(aes(x = weekday, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge")
+
+```
+
+Now, let's perform another data aggregation but this time use month as a parameter instead of weekday.
+
+```{r message=FALSE, warning=FALSE}
+trips_month <- yearly_trips %>% 
+  group_by(member_casual, month) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, month)
+
+```
+Make plots for this new dataset as well.
+```{r}
+trips_month %>% ggplot(aes(x = month, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge")
+```
+```{r}
+trips_month %>% ggplot(aes(x = month, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge")
+```
+
+All done! Save the plots and proceed to share your data to gain more insigts.
+
+
